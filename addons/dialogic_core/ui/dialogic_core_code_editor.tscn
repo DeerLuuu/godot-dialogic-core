@@ -1,0 +1,65 @@
+[gd_scene load_steps=4 format=3 uid="uid://dvtv3c1jojnd2"]
+
+[ext_resource type="Script" uid="uid://7tgq1bo2k84d" path="res://addons/dialogic_core/ui/dialogic_core_code_editor.gd" id="1_qlq3o"]
+[ext_resource type="FontFile" uid="uid://c45t65asss8gq" path="res://JetBrainsMono-ExtraBoldItalic.ttf" id="2_c4pgn"]
+
+[sub_resource type="CodeHighlighter" id="CodeHighlighter_l7ii2"]
+number_color = Color(0.498039, 1, 0.831373, 1)
+symbol_color = Color(0.941176, 0.972549, 1, 1)
+keyword_colors = {
+"_global": Color(0.341176, 0.701961, 1, 1),
+"_local": Color(0.341176, 0.701961, 1, 1),
+"_para": Color(0.341176, 0.701961, 1, 1),
+"_role": Color(0.341176, 0.701961, 1, 1),
+"_signal": Color(0.341176, 0.701961, 1, 1),
+"choice": Color(1, 0.54902, 0.8, 1),
+"continue": Color(1, 0.54902, 0.8, 1),
+"elif": Color(1, 0.54902, 0.8, 1),
+"else": Color(1, 0.54902, 0.8, 1),
+"emote": Color(0.670588, 0.788235, 1, 1),
+"end": Color(1, 0.54902, 0.8, 1),
+"event": Color(1, 0.54902, 0.8, 1),
+"goto": Color(1, 0.54902, 0.8, 1),
+"if": Color(1, 0.54902, 0.8, 1),
+"text": Color(0.670588, 0.788235, 1, 1),
+"time": Color(1, 0.54902, 0.8, 1),
+"voice": Color(0.670588, 0.788235, 1, 1)
+}
+color_regions = {
+"\" \"": Color(1, 0.929412, 0.631373, 1),
+"' '": Color(0.941176, 0.972549, 1, 1),
+"[ ]": Color(0, 1, 0.498039, 1)
+}
+
+[node name="DialogicCoreCodeEditor" type="PanelContainer"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_qlq3o")
+
+[node name="CodeEdit" type="CodeEdit" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_fonts/font = ExtResource("2_c4pgn")
+theme_override_font_sizes/font_size = 20
+indent_wrapped_lines = true
+minimap_draw = true
+syntax_highlighter = SubResource("CodeHighlighter_l7ii2")
+highlight_all_occurrences = true
+highlight_current_line = true
+draw_control_chars = true
+draw_tabs = true
+draw_spaces = true
+symbol_lookup_on_click = true
+symbol_tooltip_on_hover = true
+line_folding = true
+gutters_draw_line_numbers = true
+gutters_zero_pad_line_numbers = true
+gutters_draw_fold_gutter = true
+code_completion_enabled = true
+code_completion_prefixes = Array[String](["_", "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "n", "m", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"])
+indent_automatic = true
+auto_brace_completion_enabled = true
+auto_brace_completion_highlight_matching = true
