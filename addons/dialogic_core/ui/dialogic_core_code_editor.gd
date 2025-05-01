@@ -1,3 +1,4 @@
+# INFO 对话核心脚本编辑器
 @tool
 class_name DialogicCoreCodeEditor extends PanelContainer
 
@@ -13,11 +14,17 @@ class_name DialogicCoreCodeEditor extends PanelContainer
 
 # TODO 对话核心代码编辑器 ===============>变 量<===============
 #region 变量
+# VAR 代码编辑器
 var code_edit: CodeEdit
+# VAR 高亮解析器
 var highlighter : CodeHighlighter
+# VAR 代码分行的数组
 var code_rows : Array
+# VAR 脚本成员关键字
 var code_member_completions : Array = ["para", "role", "global", "local", "signal"]
+# VAR 脚本逻辑关键字
 var code_standard_completions : Array = ["if", "else", "elif", "goto", "continue", "end", "time", "event", "choice"]
+# VAR 脚本其它关键字
 var code_other_completions : Array = ["emote", "voice", "text"]
 #endregion
 
@@ -52,26 +59,12 @@ func _ready() -> void:
 
 # TODO 对话核心代码编辑器 ===============>信号链接方法<===============
 #region 信号链接方法
-func highlighter_create() -> CodeHighlighter:
-	var _highlighter : CodeHighlighter = CodeHighlighter.new()
-	_highlighter.clear_color_regions()
-	_highlighter.symbol_color = Color.ALICE_BLUE
-	_highlighter.number_color = Color.AQUAMARINE
-	_highlighter.add_color_region("[", "]", Color.SPRING_GREEN)
-	_highlighter.add_color_region("\'", "\'", Color.ALICE_BLUE)
-	_highlighter.add_color_region("\"", "\"", Color("ffeda1"))
-	for i in code_member_completions:
-		_highlighter.add_keyword_color("_" + i, Color("57b3ff"))
-	for i in code_standard_completions:
-		_highlighter.add_keyword_color(i, Color("ff8ccc"))
-	for i in code_other_completions:
-		_highlighter.add_keyword_color(i, Color("abc9ff"))
-	return _highlighter
-
+# FUNC 代码编辑器中文本改变时触发的方法
 func _on_code_edit_text_changed() -> void:
 	code_rows = code_edit.text.split("\n")
 	code_edit.request_code_completion()
 
+# FUNC 代码编辑器中触发自动补全时的方法
 func _on_code_edit_code_completion_requested() -> void:
 	if not code_rows[code_edit.get_caret_line()]: return
 	var key : String = code_rows[code_edit.get_caret_line()][-1]
@@ -89,5 +82,20 @@ func _on_code_edit_code_completion_requested() -> void:
 
 # TODO 对话核心代码编辑器 ===============>工具方法<===============
 #region 工具方法
-
+# FUNC 创建脚本高亮解析器
+func highlighter_create() -> CodeHighlighter:
+	var _highlighter : CodeHighlighter = CodeHighlighter.new()
+	_highlighter.clear_color_regions()
+	_highlighter.symbol_color = Color.ALICE_BLUE
+	_highlighter.number_color = Color.AQUAMARINE
+	_highlighter.add_color_region("[", "]", Color.SPRING_GREEN)
+	_highlighter.add_color_region("\'", "\'", Color.ALICE_BLUE)
+	_highlighter.add_color_region("\"", "\"", Color("ffeda1"))
+	for i in code_member_completions:
+		_highlighter.add_keyword_color("_" + i, Color("57b3ff"))
+	for i in code_standard_completions:
+		_highlighter.add_keyword_color(i, Color("ff8ccc"))
+	for i in code_other_completions:
+		_highlighter.add_keyword_color(i, Color("abc9ff"))
+	return _highlighter
 #endregion

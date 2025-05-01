@@ -3,7 +3,7 @@
 [ext_resource type="Script" uid="uid://7tgq1bo2k84d" path="res://addons/dialogic_core/ui/dialogic_core_code_editor.gd" id="1_qlq3o"]
 [ext_resource type="FontFile" uid="uid://c45t65asss8gq" path="res://JetBrainsMono-ExtraBoldItalic.ttf" id="2_c4pgn"]
 
-[sub_resource type="CodeHighlighter" id="CodeHighlighter_l7ii2"]
+[sub_resource type="CodeHighlighter" id="CodeHighlighter_c4pgn"]
 number_color = Color(0.498039, 1, 0.831373, 1)
 symbol_color = Color(0.941176, 0.972549, 1, 1)
 keyword_colors = {
@@ -37,6 +37,8 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
 script = ExtResource("1_qlq3o")
 
 [node name="CodeEdit" type="CodeEdit" parent="."]
@@ -46,7 +48,7 @@ theme_override_fonts/font = ExtResource("2_c4pgn")
 theme_override_font_sizes/font_size = 20
 indent_wrapped_lines = true
 minimap_draw = true
-syntax_highlighter = SubResource("CodeHighlighter_l7ii2")
+syntax_highlighter = SubResource("CodeHighlighter_c4pgn")
 highlight_all_occurrences = true
 highlight_current_line = true
 draw_control_chars = true
