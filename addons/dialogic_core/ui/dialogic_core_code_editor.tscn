@@ -6,6 +6,7 @@
 [sub_resource type="CodeHighlighter" id="CodeHighlighter_c4pgn"]
 number_color = Color(0.498039, 1, 0.831373, 1)
 symbol_color = Color(0.941176, 0.972549, 1, 1)
+member_variable_color = Color(0.941176, 0.972549, 1, 1)
 keyword_colors = {
 "_global": Color(0.341176, 0.701961, 1, 1),
 "_local": Color(0.341176, 0.701961, 1, 1),

@@ -9,11 +9,16 @@ class_name DialogicCoreCodeEditor extends PanelContainer
 
 # TODO 对话核心代码编辑器 ===============>常 量<===============
 #region 常量
+# ENUM 代码错误枚举
 enum CodeError{
 	OK,
 	MISSING_END_SYMBOL,
-	SPELLING_ERROR
+	SPELLING_ERROR,
+	EXPRESSION_ERROR,
+	PARAMETER_ERROR,
+	ENCODING_ERROR
 }
+
 #endregion
 
 # TODO 对话核心代码编辑器 ===============>变 量<===============
@@ -60,6 +65,7 @@ func _ready() -> void:
 	code_edit.add_theme_font_override("font", load("res://JetBrainsMono-ExtraBoldItalic.ttf"))
 	code_edit.add_theme_font_size_override("font_size", 20)
 
+	# NOTE 信号链接初始化
 	code_edit.code_completion_requested.connect(_on_code_edit_code_completion_requested)
 	code_edit.text_changed.connect(_on_code_edit_text_changed)
 #endregion
@@ -126,13 +132,13 @@ func code_end_or_spell_error_detection(code_row : String) -> CodeError:
 		if code_parts.has(i):
 			if code_parts.has("："):
 				code_printerr("你可能错误的使用了中文的符号，请检查代码第%s行" % code_row_num)
-				return CodeError.SPELLING_ERROR
+				return CodeError.ENCODING_ERROR
 			if code_parts.has(":"): return CodeError.OK
 			if code_parts[-1] != "":
 				if code_parts[-1][-1] == ":": return CodeError.OK
 				if code_parts[-1][-1] == "：":
 					code_printerr("你可能错误的使用了中文的符号，请检查代码第%s行" % code_row_num)
-					return CodeError.SPELLING_ERROR
+					return CodeError.ENCODING_ERROR
 			code_printerr("可能是缺失结尾符号，请检查代码第%s行" % code_row_num)
 			return CodeError.MISSING_END_SYMBOL
 
@@ -165,15 +171,15 @@ func code_value_error_detection(code_row : String) -> CodeError:
 			var code_part_index : int = code_parts.find(i) + 1
 			if code_parts.size() == 1:
 				code_printerr("你可能在一个需要参数的关键字后面缺失了参数，请检查代码第%s行" % code_row_num)
-				return CodeError.SPELLING_ERROR
+				return CodeError.PARAMETER_ERROR
 
 			var code_part : String = code_parts[code_part_index]
 			if code_part == "":
 				code_printerr("你可能在一个需要参数的关键字后面缺失了参数，请检查代码第%s行" % code_row_num)
-				return CodeError.SPELLING_ERROR
+				return CodeError.PARAMETER_ERROR
 			if not code_part.is_valid_float():
 				code_printerr("你可能在一个需要参数的关键字后面使用了错误的参数，请检查代码第%s行" % code_row_num)
-				return CodeError.SPELLING_ERROR
+				return CodeError.PARAMETER_ERROR
 
 	# NOTE 字符串关键字错误检测
 	for i in string_value_keys:
@@ -181,17 +187,17 @@ func code_value_error_detection(code_row : String) -> CodeError:
 			var code_part_index : int = code_parts.find(i) + 1
 			if code_parts.size() == 1:
 				code_printerr("你可能在一个需要参数的关键字后面缺失了参数，请检查代码第%s行" % code_row_num)
-				return CodeError.SPELLING_ERROR
+				return CodeError.PARAMETER_ERROR
 
 			var code_part : String = code_parts[code_part_index]
 			if code_part == "":
 				code_printerr("你可能在一个需要参数的关键字后面缺失了参数，请检查代码第%s行" % code_row_num)
-				return CodeError.SPELLING_ERROR
+				return CodeError.PARAMETER_ERROR
 
 			if i == "voice":
 				if not code_part.is_absolute_path():
 					code_printerr("你可能在一个需要参数的关键字后面使用了错误的参数，请检查代码第%s行" % code_row_num)
-					return CodeError.SPELLING_ERROR
+					return CodeError.PARAMETER_ERROR
 
 	# NOTE 字典关键字错误检测
 	for i in dictionary_value_keys:
@@ -199,7 +205,7 @@ func code_value_error_detection(code_row : String) -> CodeError:
 			var code_part_index : int = code_parts.find(i) + 1
 			if code_parts.size() == 1:
 				code_printerr("你可能在一个需要参数的关键字后面缺失了参数，请检查代码第%s行" % code_row_num)
-				return CodeError.SPELLING_ERROR
+				return CodeError.PARAMETER_ERROR
 
 			var code_part : String
 
@@ -212,13 +218,10 @@ func code_value_error_detection(code_row : String) -> CodeError:
 
 			if code_part == "":
 				code_printerr("你可能在一个需要参数的关键字后面缺失了参数，请检查代码第%s行" % code_row_num)
-				return CodeError.SPELLING_ERROR
-			if code_part.count("[") != 1 or code_part.count("]") != 1:
+				return CodeError.PARAMETER_ERROR
+			if not is_valid_format(code_part):
 				code_printerr("你可能在一个需要参数的关键字后面使用了错误的参数，请检查代码第%s行" % code_row_num)
-				return CodeError.SPELLING_ERROR
-			if not code_part.begins_with("[") or not code_part.ends_with("]"):
-				code_printerr("你可能在一个需要参数的关键字后面使用了错误的参数，请检查代码第%s行" % code_row_num)
-				return CodeError.SPELLING_ERROR
+				return CodeError.PARAMETER_ERROR
 
 	# NOTE 条件关键字错误检测
 	for i in condition_value_keys:
@@ -226,7 +229,7 @@ func code_value_error_detection(code_row : String) -> CodeError:
 			var code_part_index : int = code_parts.find(i) + 1
 			if code_parts.size() == 1:
 				code_printerr("你可能在一个需要参数的关键字后面缺失了参数，请检查代码第%s行" % code_row_num)
-				return CodeError.SPELLING_ERROR
+				return CodeError.PARAMETER_ERROR
 
 			var code_part : String
 
@@ -242,11 +245,11 @@ func code_value_error_detection(code_row : String) -> CodeError:
 
 			if code_part == "":
 				code_printerr("你可能在一个需要参数的关键字后面缺失了参数，请检查代码第%s行" % code_row_num)
-				return CodeError.SPELLING_ERROR
+				return CodeError.PARAMETER_ERROR
 
 			if not is_logic_expression(code_part):
-				code_printerr("请输入正确的正则表达式，请检查代码第%s行" % code_row_num)
-				return CodeError.SPELLING_ERROR
+				code_printerr("请输入正确的条件格式，请检查代码第%s行" % code_row_num)
+				return CodeError.EXPRESSION_ERROR
 
 	return CodeError.OK
 
@@ -268,15 +271,18 @@ func highlighter_create() -> CodeHighlighter:
 		_highlighter.add_keyword_color(i, Color("abc9ff"))
 	return _highlighter
 
+# FUNC 代码错误信息显示
 func code_printerr(err_str : String) -> void:
 	err_label.text = err_str
 
+# FUNC 代码报错信息清除
 func code_err_clear() -> void:
 	err_label.text = ""
 
-var pattern = "^\\s*([a-zA-Z_][\\w]*|\\d+)\\s*(==|!=|>|<|>=|<=|&&|\\|\\|| and | or )\\s*([a-zA-Z_][\\w]*|\\d+|\\s*((\\d+)|(['\"]).+?\\5))\\s*$"
-
+# FUNC 条件格式判断方法
 func is_logic_expression(s: String) -> bool:
+	const pattern = "^\\s*([a-zA-Z_][\\w]*|\\d+)\\s*(==|!=|>|<|>=|<=|&&|\\|\\|| and | or )\\s*([a-zA-Z_][\\w]*|\\d+|\\s*((\\d+)|(['\"]).+?\\5))\\s*$"
+
 	var clauses : Array
 	if s.contains("and"):
 		clauses = s.split("and", false)
@@ -290,5 +296,14 @@ func is_logic_expression(s: String) -> bool:
 		reg_ex.compile(pattern)
 		if !reg_ex.search(clause.strip_edges()):
 			return false
+
 	return clauses.size()  > 0
+
+# FUNC 数据规范判断方法
+func is_valid_format(s : String) -> bool:
+	const pattern = "^\\[\\s*(\"?[\\p{Han}a-zA-Z0-9_.-]+\"?|\\d+|\'.+?\')(\\s*,\\s*(\"?[\\p{Han}a-zA-Z0-9_.-]+\"?|\\d+))*\\s*\\]$"
+	var regex = RegEx.new()
+	# 编译正则表达式（忽略空白和注释）
+	regex.compile(pattern.strip_edges())
+	return regex.search(s)  != null
 #endregion
