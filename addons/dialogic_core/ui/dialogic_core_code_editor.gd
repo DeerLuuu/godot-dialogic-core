@@ -73,14 +73,22 @@ func _on_code_edit_text_changed() -> void:
 	code_err_clear()
 
 	for i in code_rows.size():
-		var error : CodeError = code_error_detection(code_rows[i])
 		code_edit.set_line_background_color(i, Color("252525"))
+
+	for i in code_rows.size():
+		var error : CodeError = code_end_or_spell_error_detection(code_rows[i])
+		if error == CodeError.OK: continue
+		code_edit.set_line_background_color(i, Color("663e3a"))
+
+	for i in code_rows.size():
+		var error : CodeError = code_value_error_detection(code_rows[i])
 		if error == CodeError.OK: continue
 		code_edit.set_line_background_color(i, Color("663e3a"))
 
 # FUNC 代码编辑器中触发自动补全时的方法
 func _on_code_edit_code_completion_requested() -> void:
 	if code_rows.size() == 0: return
+	if code_edit.text == "": return
 	var key : String = code_rows[code_edit.get_caret_line()][-1]
 	if key in code_edit.code_completion_prefixes:
 		for i in code_member_completions:
@@ -99,19 +107,21 @@ func _on_code_edit_code_completion_requested() -> void:
 
 # TODO 对话核心代码编辑器 ===============>工具方法<===============
 #region 工具方法
-# FUNC 代码错误检测器
-# FIXME 一个烂摊子，后面需要重写这个部分
-func code_error_detection(code_row : String) -> CodeError:
-	if code_row == "": return CodeError.OK
+# FUNC 代码结尾、拼写错误检测器
+func code_end_or_spell_error_detection(code_row : String) -> CodeError:
 	if code_row.dedent() == "": return CodeError.OK
+
 	var code_row_num : int = code_rows.find(code_row) + 1
 	var code_parts : Array = code_row.split(" ")
 	var tab_num : int = 0
-	tab_num = code_parts[0].count("\t")
 	var has_tab_part : String = code_parts[0]
+	var not_end_keys : Array = ["continue", "end", "goto", "time", "event", "emote", "voice", "_global", "_local", "_signal", "text"]
+	var has_end_keys : Array = ["if", "else", "elif", "choice", "_para", "_role"]
+
+	tab_num = code_parts[0].count("\t")
 	code_parts[0] = has_tab_part.split("\t")[-1]
 
-	for i in ["_para", "_role", "if", "else", "elif", "text", "choice"]:
+	for i in has_end_keys:
 		if code_parts.has(i + ":"): return CodeError.OK
 		if code_parts.has(i):
 			if code_parts.has("："):
@@ -126,18 +136,119 @@ func code_error_detection(code_row : String) -> CodeError:
 			code_printerr("可能是缺失结尾符号，请检查代码第%s行" % code_row_num)
 			return CodeError.MISSING_END_SYMBOL
 
-	for i in ["_global", "_local", "_signal"]:
-		if code_parts.has(i): return CodeError.OK
-
-	for i in ["goto", "continue", "end", "time", "event"]:
-		if code_parts.has(i): return CodeError.OK
-
-	for i in code_other_completions:
+	for i in not_end_keys:
 		if code_parts.has(i): return CodeError.OK
 
 	code_printerr("可能是拼写错误，请检查代码第%s行" % code_row_num)
 	return CodeError.SPELLING_ERROR
 
+# FUNC 代码值错误检查器
+func code_value_error_detection(code_row : String) -> CodeError:
+	if code_row.dedent() == "": return CodeError.OK
+
+	var code_row_num : int = code_rows.find(code_row) + 1
+	var code_parts : Array = code_row.split(" ")
+	var tab_num : int = 0
+	var has_tab_part : String = code_parts[0]
+
+	var float_value_keys : Array = ["time"]
+	var string_value_keys : Array = ["goto", "emote", "text", "_para", "_role", "voice", "choice"]
+	var dictionary_value_keys : Array = ["event", "_global", "_local", "_signal"]
+	var condition_value_keys : Array = ["if", "elif"]
+
+	tab_num = code_parts[0].count("\t")
+	code_parts[0] = has_tab_part.split("\t", false)[-1]
+
+	# NOTE 浮点数关键字错误检测
+	for i in float_value_keys:
+		if code_parts.has(i):
+			var code_part_index : int = code_parts.find(i) + 1
+			if code_parts.size() == 1:
+				code_printerr("你可能在一个需要参数的关键字后面缺失了参数，请检查代码第%s行" % code_row_num)
+				return CodeError.SPELLING_ERROR
+
+			var code_part : String = code_parts[code_part_index]
+			if code_part == "":
+				code_printerr("你可能在一个需要参数的关键字后面缺失了参数，请检查代码第%s行" % code_row_num)
+				return CodeError.SPELLING_ERROR
+			if not code_part.is_valid_float():
+				code_printerr("你可能在一个需要参数的关键字后面使用了错误的参数，请检查代码第%s行" % code_row_num)
+				return CodeError.SPELLING_ERROR
+
+	# NOTE 字符串关键字错误检测
+	for i in string_value_keys:
+		if code_parts.has(i):
+			var code_part_index : int = code_parts.find(i) + 1
+			if code_parts.size() == 1:
+				code_printerr("你可能在一个需要参数的关键字后面缺失了参数，请检查代码第%s行" % code_row_num)
+				return CodeError.SPELLING_ERROR
+
+			var code_part : String = code_parts[code_part_index]
+			if code_part == "":
+				code_printerr("你可能在一个需要参数的关键字后面缺失了参数，请检查代码第%s行" % code_row_num)
+				return CodeError.SPELLING_ERROR
+
+			if i == "voice":
+				if not code_part.is_absolute_path():
+					code_printerr("你可能在一个需要参数的关键字后面使用了错误的参数，请检查代码第%s行" % code_row_num)
+					return CodeError.SPELLING_ERROR
+
+	# NOTE 字典关键字错误检测
+	for i in dictionary_value_keys:
+		if code_parts.has(i):
+			var code_part_index : int = code_parts.find(i) + 1
+			if code_parts.size() == 1:
+				code_printerr("你可能在一个需要参数的关键字后面缺失了参数，请检查代码第%s行" % code_row_num)
+				return CodeError.SPELLING_ERROR
+
+			var code_part : String
+
+			for key : String in code_parts:
+				if key == "": continue
+				if key == "\t": continue
+				if key == i: continue
+				code_part += key
+				if key.ends_with("]"): break
+
+			if code_part == "":
+				code_printerr("你可能在一个需要参数的关键字后面缺失了参数，请检查代码第%s行" % code_row_num)
+				return CodeError.SPELLING_ERROR
+			if code_part.count("[") != 1 or code_part.count("]") != 1:
+				code_printerr("你可能在一个需要参数的关键字后面使用了错误的参数，请检查代码第%s行" % code_row_num)
+				return CodeError.SPELLING_ERROR
+			if not code_part.begins_with("[") or not code_part.ends_with("]"):
+				code_printerr("你可能在一个需要参数的关键字后面使用了错误的参数，请检查代码第%s行" % code_row_num)
+				return CodeError.SPELLING_ERROR
+
+	# NOTE 条件关键字错误检测
+	for i in condition_value_keys:
+		if code_parts.has(i):
+			var code_part_index : int = code_parts.find(i) + 1
+			if code_parts.size() == 1:
+				code_printerr("你可能在一个需要参数的关键字后面缺失了参数，请检查代码第%s行" % code_row_num)
+				return CodeError.SPELLING_ERROR
+
+			var code_part : String
+
+			for key : String in code_parts:
+				if key == "": continue
+				if key == "\t": continue
+				if key == i: continue
+				if key == ":": continue
+				code_part += key + " "
+
+			if code_part.contains(":"):
+				code_part = code_part.left(code_part.length() - 2)
+
+			if code_part == "":
+				code_printerr("你可能在一个需要参数的关键字后面缺失了参数，请检查代码第%s行" % code_row_num)
+				return CodeError.SPELLING_ERROR
+
+			if not is_logic_expression(code_part):
+				code_printerr("请输入正确的正则表达式，请检查代码第%s行" % code_row_num)
+				return CodeError.SPELLING_ERROR
+
+	return CodeError.OK
 
 # FUNC 创建脚本高亮解析器
 func highlighter_create() -> CodeHighlighter:
@@ -145,6 +256,7 @@ func highlighter_create() -> CodeHighlighter:
 	_highlighter.clear_color_regions()
 	_highlighter.symbol_color = Color.ALICE_BLUE
 	_highlighter.number_color = Color.AQUAMARINE
+	_highlighter.member_variable_color = Color.ALICE_BLUE
 	_highlighter.add_color_region("[", "]", Color.SPRING_GREEN)
 	_highlighter.add_color_region("\'", "\'", Color.ALICE_BLUE)
 	_highlighter.add_color_region("\"", "\"", Color("ffeda1"))
@@ -161,4 +273,22 @@ func code_printerr(err_str : String) -> void:
 
 func code_err_clear() -> void:
 	err_label.text = ""
+
+var pattern = "^\\s*([a-zA-Z_][\\w]*|\\d+)\\s*(==|!=|>|<|>=|<=|&&|\\|\\|| and | or )\\s*([a-zA-Z_][\\w]*|\\d+|\\s*((\\d+)|(['\"]).+?\\5))\\s*$"
+
+func is_logic_expression(s: String) -> bool:
+	var clauses : Array
+	if s.contains("and"):
+		clauses = s.split("and", false)
+	elif s.contains("or"):
+		clauses = s.split("or", false)
+	else :
+		clauses = [s]
+
+	for clause : String in clauses:
+		var reg_ex : RegEx = RegEx.new()
+		reg_ex.compile(pattern)
+		if !reg_ex.search(clause.strip_edges()):
+			return false
+	return clauses.size()  > 0
 #endregion
