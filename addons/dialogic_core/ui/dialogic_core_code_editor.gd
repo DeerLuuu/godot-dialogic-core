@@ -18,7 +18,12 @@ enum CodeError{
 	PARAMETER_ERROR,
 	ENCODING_ERROR
 }
-
+# ENUM 关键字类型枚举
+enum CodeKeyType{
+	TEXT,
+	CHOICE,
+	END = -999
+}
 #endregion
 
 # TODO 对话核心代码编辑器 ===============>变 量<===============
@@ -37,6 +42,8 @@ var code_standard_completions : Array = ["if", "else", "elif", "goto", "continue
 var code_other_completions : Array = ["emote", "voice", "text"]
 # VAR 报错文字容器
 var err_label: Label
+# VAR 无报错
+var not_err : bool = true
 #endregion
 
 # TODO 对话核心代码编辑器 ===============>虚方法<===============
@@ -81,15 +88,21 @@ func _on_code_edit_text_changed() -> void:
 	for i in code_rows.size():
 		code_edit.set_line_background_color(i, Color("252525"))
 
+	not_err = true
+
 	for i in code_rows.size():
 		var error : CodeError = code_end_or_spell_error_detection(code_rows[i])
 		if error == CodeError.OK: continue
 		code_edit.set_line_background_color(i, Color("663e3a"))
+		not_err = false
 
 	for i in code_rows.size():
 		var error : CodeError = code_value_error_detection(code_rows[i])
 		if error == CodeError.OK: continue
 		code_edit.set_line_background_color(i, Color("663e3a"))
+		not_err = false
+
+	if not_err: code_parser()
 
 # FUNC 代码编辑器中触发自动补全时的方法
 func _on_code_edit_code_completion_requested() -> void:
@@ -98,13 +111,8 @@ func _on_code_edit_code_completion_requested() -> void:
 	var key : String = code_rows[code_edit.get_caret_line()][-1]
 	if key in code_edit.code_completion_prefixes:
 		for i in code_member_completions:
-			if i in ["global", "local", "signal"]:
-				code_edit.add_code_completion_option(CodeEdit.KIND_MEMBER, i, i + "() ")
-			else :
-				code_edit.add_code_completion_option(CodeEdit.KIND_MEMBER, i, i + " ")
+			code_edit.add_code_completion_option(CodeEdit.KIND_MEMBER, i, i + " ")
 		for i in code_standard_completions:
-			if i == "if" or i == "elif":
-				code_edit.add_code_completion_option(CodeEdit.KIND_MEMBER, i, i + "() ")
 			code_edit.add_code_completion_option(CodeEdit.KIND_MEMBER, i, i + " ")
 		for i in code_other_completions:
 			code_edit.add_code_completion_option(CodeEdit.KIND_MEMBER, i, i + " ")
@@ -113,6 +121,92 @@ func _on_code_edit_code_completion_requested() -> void:
 
 # TODO 对话核心代码编辑器 ===============>工具方法<===============
 #region 工具方法
+# FUNC 代码解析器
+func code_parser() -> void:
+	var dic : Dictionary
+	var current_para : String = ""
+	var current_role : String = ""
+	var current_text : String = ""
+	for code_row in code_rows:
+		if code_row.dedent() == "": continue
+		var code_parts : Array = code_row.split(" ")
+		var code_part_index : int
+		var is_var : bool = false
+
+		var tab_num : int = 0
+		tab_num = code_parts[0].count("\t")
+		code_parts[0] = code_parts[0].split("\t")[-1]
+
+		# NOTE 解析成员关键字 global 和 local
+		for i in ["_global", "_local"]:
+			if code_parts.has(i):
+				var code_part : String
+				for key : String in code_parts:
+					if key == "": continue
+					if key == "\t": continue
+					if key == i: continue
+					code_part += key
+				is_var = true
+		if is_var: continue
+
+		# NOTE 解析段落关键字
+		if code_parts.has("_para"):
+			code_part_index = code_parts.find("_para") + 1
+			var code_part : String = code_parts[code_part_index]
+			if code_part.ends_with(":"):
+				code_part = code_part.erase(code_part.length()-1)
+			current_para = code_part
+
+		# NOTE 解析角色关键字
+		if code_parts.has("_role"):
+			code_part_index = code_parts.find("_role") + 1
+			var code_part : String = code_parts[code_part_index]
+			if code_part.ends_with(":"):
+				code_part = code_part.erase(code_part.length()-1)
+			current_role = code_part
+
+		# NOTE 解析文本关键字
+		if code_parts.has("text"):
+			code_part_index = code_parts.find("text") + 1
+			var code_part : String = code_parts[code_part_index]
+			if code_part.ends_with(":"):
+				code_part = code_part.erase(code_part.length()-1)
+			current_text = code_part
+			if not dic.has(current_para):
+				dic[current_para] = {current_role : []}
+			if not dic[current_para].has(current_role):
+				dic[current_para][current_role] = []
+			dic[current_para][current_role].append({current_text : [{"cls" : CodeKeyType.TEXT}]})
+
+		# NOTE 解析表情关键字
+		if code_parts.has("emote"):
+			code_part_index = code_parts.find("emote") + 1
+			var code_part : String = code_parts[code_part_index]
+			for i in dic[current_para][current_role].size():
+				var dic_current_texts : Dictionary = dic[current_para][current_role][i]
+				if dic_current_texts.keys()[0] == current_text:
+					dic_current_texts[current_text].append({"emote" : code_part})
+					break
+
+		# NOTE 解析声音关键字
+		if code_parts.has("voice"):
+			code_part_index = code_parts.find("voice") + 1
+			var code_part : String = code_parts[code_part_index]
+			for i in dic[current_para][current_role].size():
+				var dic_current_texts : Dictionary = dic[current_para][current_role][i]
+				if dic_current_texts.keys()[0] == current_text:
+					dic_current_texts[current_text].append({"voice" : code_part})
+					break
+
+		# NOTE 解析结束关键字
+		if code_parts.has("end"):
+			for i in dic[current_para][current_role].size():
+				var dic_current_texts : Dictionary = dic[current_para][current_role][i]
+				if dic_current_texts.keys()[0] == current_text:
+					dic_current_texts[current_text].append(CodeKeyType.END)
+					break
+	print(dic)
+
 # FUNC 代码结尾、拼写错误检测器
 func code_end_or_spell_error_detection(code_row : String) -> CodeError:
 	if code_row.dedent() == "": return CodeError.OK
@@ -251,6 +345,12 @@ func code_value_error_detection(code_row : String) -> CodeError:
 				code_printerr("请输入正确的条件格式，请检查代码第%s行" % code_row_num)
 				return CodeError.EXPRESSION_ERROR
 
+	for i in ["emote", "voice"]:
+		if code_parts.has(i):
+			if tab_num < 3:
+				code_printerr("一些关键字的位置不正确，请检查代码第%s行" % code_row_num)
+				return CodeError.PARAMETER_ERROR
+
 	return CodeError.OK
 
 # FUNC 创建脚本高亮解析器
@@ -281,29 +381,15 @@ func code_err_clear() -> void:
 
 # FUNC 条件格式判断方法
 func is_logic_expression(s: String) -> bool:
-	const pattern = "^\\s*([a-zA-Z_][\\w]*|\\d+)\\s*(==|!=|>|<|>=|<=|&&|\\|\\|| and | or )\\s*([a-zA-Z_][\\w]*|\\d+|\\s*((\\d+)|(['\"]).+?\\5))\\s*$"
-
-	var clauses : Array
-	if s.contains("and"):
-		clauses = s.split("and", false)
-	elif s.contains("or"):
-		clauses = s.split("or", false)
-	else :
-		clauses = [s]
-
-	for clause : String in clauses:
-		var reg_ex : RegEx = RegEx.new()
-		reg_ex.compile(pattern)
-		if !reg_ex.search(clause.strip_edges()):
-			return false
-
-	return clauses.size()  > 0
+	const pattern = "^\\s*((not\\s+)?(((?:[a-zA-Z_]\\w*|[-+]?\\d+(?:\\.\\d+)?|[\"'].+?[\"'])(?:\\s*[+\\-*/]\\s*(?:[a-zA-Z_]\\w*|[-+]?\\d+(?:\\.\\d+)?|[\"'].+?[\"']))*|\\(.+?\\))\\s*(==|!=|>|<|>=|<=)\\s*((?:[a-zA-Z_]\\w*|[-+]?\\d+(?:\\.\\d+)?|[\"'].+?[\"'])(?:\\s*[+\\-*/]\\s*(?:[a-zA-Z_]\\w*|[-+]?\\d+(?:\\.\\d+)?|[\"'].+?[\"']))*|\\(.+?\\)))(\\s+(and|or)\\s+(not\\s+)?(((?:[a-zA-Z_]\\w*|[-+]?\\d+(?:\\.\\d+)?|[\"'].+?[\"'])(?:\\s*[+\\-*/]\\s*(?:[a-zA-Z_]\\w*|[-+]?\\d+(?:\\.\\d+)?|[\"'].+?[\"']))*|\\(.+?\\))\\s*(==|!=|>|<|>=|<=)\\s*.+?))*)\\s*$"
+	var reg_ex : RegEx = RegEx.new()
+	reg_ex.compile(pattern)
+	return reg_ex.search(s) != null
 
 # FUNC 数据规范判断方法
 func is_valid_format(s : String) -> bool:
 	const pattern = "^\\[\\s*(\"?[\\p{Han}a-zA-Z0-9_.-]+\"?|\\d+|\'.+?\')(\\s*,\\s*(\"?[\\p{Han}a-zA-Z0-9_.-]+\"?|\\d+))*\\s*\\]$"
 	var regex = RegEx.new()
-	# 编译正则表达式（忽略空白和注释）
-	regex.compile(pattern.strip_edges())
-	return regex.search(s)  != null
+	regex.compile(pattern)
+	return regex.search(s.strip_edges()) != null
 #endregion
