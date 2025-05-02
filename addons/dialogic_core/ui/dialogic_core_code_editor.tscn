@@ -1,4 +1,4 @@
-[gd_scene load_steps=4 format=3 uid="uid://dvtv3c1jojnd2"]
+[gd_scene load_steps=5 format=3 uid="uid://dvtv3c1jojnd2"]
 
 [ext_resource type="Script" uid="uid://7tgq1bo2k84d" path="res://addons/dialogic_core/ui/dialogic_core_code_editor.gd" id="1_qlq3o"]
 [ext_resource type="FontFile" uid="uid://c45t65asss8gq" path="res://JetBrainsMono-ExtraBoldItalic.ttf" id="2_c4pgn"]
@@ -31,6 +31,10 @@ color_regions = {
 "[ ]": Color(0, 1, 0.498039, 1)
 }
 
+[sub_resource type="LabelSettings" id="LabelSettings_c4pgn"]
+font_size = 24
+font_color = Color(0.937255, 0.447059, 0.4, 1)
+
 [node name="DialogicCoreCodeEditor" type="PanelContainer"]
 anchors_preset = 15
 anchor_right = 1.0
@@ -41,9 +45,13 @@ size_flags_horizontal = 3
 size_flags_vertical = 3
 script = ExtResource("1_qlq3o")
 
-[node name="CodeEdit" type="CodeEdit" parent="."]
+[node name="VBoxContainer" type="VBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="CodeEdit" type="CodeEdit" parent="VBoxContainer"]
 unique_name_in_owner = true
 layout_mode = 2
+size_flags_vertical = 3
 theme_override_fonts/font = ExtResource("2_c4pgn")
 theme_override_font_sizes/font_size = 20
 indent_wrapped_lines = true
@@ -65,3 +73,15 @@ code_completion_prefixes = Array[String](["_", "a", "b", "c", "d", "e", "f", "g"
 indent_automatic = true
 auto_brace_completion_enabled = true
 auto_brace_completion_highlight_matching = true
+
+[node name="HBoxContainer" type="HBoxContainer" parent="VBoxContainer"]
+custom_minimum_size = Vector2(0, 50)
+layout_mode = 2
+
+[node name="ErrLabel" type="Label" parent="VBoxContainer/HBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 1
+label_settings = SubResource("LabelSettings_c4pgn")
+vertical_alignment = 1
