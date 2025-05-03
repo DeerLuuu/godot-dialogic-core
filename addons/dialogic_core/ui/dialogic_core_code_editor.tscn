@@ -14,6 +14,7 @@ keyword_colors = {
 "_role": Color(0.341176, 0.701961, 1, 1),
 "_signal": Color(0.341176, 0.701961, 1, 1),
 "choice": Color(1, 0.54902, 0.8, 1),
+"condition": Color(1, 0.54902, 0.8, 1),
 "continue": Color(1, 0.54902, 0.8, 1),
 "elif": Color(1, 0.54902, 0.8, 1),
 "else": Color(1, 0.54902, 0.8, 1),
@@ -21,7 +22,7 @@ keyword_colors = {
 "end": Color(1, 0.54902, 0.8, 1),
 "event": Color(1, 0.54902, 0.8, 1),
 "goto": Color(1, 0.54902, 0.8, 1),
-"if": Color(1, 0.54902, 0.8, 1),
+"set": Color(1, 0.54902, 0.8, 1),
 "text": Color(0.670588, 0.788235, 1, 1),
 "time": Color(1, 0.54902, 0.8, 1),
 "voice": Color(0.670588, 0.788235, 1, 1)
