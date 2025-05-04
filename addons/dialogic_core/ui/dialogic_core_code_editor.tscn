@@ -1,4 +1,4 @@
-[gd_scene load_steps=5 format=3 uid="uid://dvtv3c1jojnd2"]
+[gd_scene load_steps=15 format=3 uid="uid://dvtv3c1jojnd2"]
 
 [ext_resource type="Script" uid="uid://7tgq1bo2k84d" path="res://addons/dialogic_core/ui/dialogic_core_code_editor.gd" id="1_qlq3o"]
 [ext_resource type="FontFile" uid="uid://c45t65asss8gq" path="res://JetBrainsMono-ExtraBoldItalic.ttf" id="2_c4pgn"]
@@ -33,8 +33,28 @@ color_regions = {
 "[ ]": Color(0, 1, 0.498039, 1)
 }
 
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_l7ii2"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_w21ck"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_b4kc8"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_st845"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_bcljq"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_a4xfu"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_lhffh"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_dn4kn"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_a88yf"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_xe7f0"]
+
 [sub_resource type="LabelSettings" id="LabelSettings_c4pgn"]
-font_size = 24
+font_size = 20
 font_color = Color(0.937255, 0.447059, 0.4, 1)
 
 [node name="DialogicCoreCodeEditor" type="PanelContainer"]
@@ -47,15 +67,34 @@ size_flags_horizontal = 3
 size_flags_vertical = 3
 script = ExtResource("1_qlq3o")
 
-[node name="VBoxContainer" type="VBoxContainer" parent="."]
+[node name="HSplitContainer" type="HSplitContainer" parent="."]
+layout_mode = 2
+split_offset = 150
+
+[node name="Slider" type="VBoxContainer" parent="HSplitContainer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(60, 0)
 layout_mode = 2
 
-[node name="CodeEdit" type="CodeEdit" parent="VBoxContainer"]
+[node name="FileSearchEdit" type="LineEdit" parent="HSplitContainer/Slider"]
+unique_name_in_owner = true
+layout_mode = 2
+placeholder_text = "筛选文件"
+
+[node name="FileItemList" type="ItemList" parent="HSplitContainer/Slider"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="VBoxContainer" type="VBoxContainer" parent="HSplitContainer"]
+layout_mode = 2
+
+[node name="CodeEdit" type="CodeEdit" parent="HSplitContainer/VBoxContainer"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
 theme_override_fonts/font = ExtResource("2_c4pgn")
-theme_override_font_sizes/font_size = 20
+theme_override_font_sizes/font_size = 15
 indent_wrapped_lines = true
 minimap_draw = true
 syntax_highlighter = SubResource("CodeHighlighter_c4pgn")
@@ -76,14 +115,75 @@ indent_automatic = true
 auto_brace_completion_enabled = true
 auto_brace_completion_highlight_matching = true
 
-[node name="HBoxContainer" type="HBoxContainer" parent="VBoxContainer"]
+[node name="HBoxContainer" type="HBoxContainer" parent="HSplitContainer/VBoxContainer"]
 custom_minimum_size = Vector2(0, 50)
 layout_mode = 2
 
-[node name="ErrLabel" type="Label" parent="VBoxContainer/HBoxContainer"]
+[node name="ShowOrHideSliderButton" type="Button" parent="HSplitContainer/VBoxContainer/HBoxContainer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(36, 0)
+layout_mode = 2
+theme_override_styles/disabled_mirrored = SubResource("StyleBoxEmpty_l7ii2")
+theme_override_styles/disabled = SubResource("StyleBoxEmpty_w21ck")
+theme_override_styles/hover_pressed_mirrored = SubResource("StyleBoxEmpty_b4kc8")
+theme_override_styles/hover_pressed = SubResource("StyleBoxEmpty_st845")
+theme_override_styles/hover_mirrored = SubResource("StyleBoxEmpty_bcljq")
+theme_override_styles/hover = SubResource("StyleBoxEmpty_a4xfu")
+theme_override_styles/pressed_mirrored = SubResource("StyleBoxEmpty_lhffh")
+theme_override_styles/pressed = SubResource("StyleBoxEmpty_dn4kn")
+theme_override_styles/normal_mirrored = SubResource("StyleBoxEmpty_a88yf")
+theme_override_styles/normal = SubResource("StyleBoxEmpty_xe7f0")
+text = "<"
+
+[node name="ScrollContainer" type="ScrollContainer" parent="HSplitContainer/VBoxContainer/HBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ErrLabel" type="Label" parent="HSplitContainer/VBoxContainer/HBoxContainer/ScrollContainer"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-size_flags_vertical = 1
+size_flags_vertical = 3
 label_settings = SubResource("LabelSettings_c4pgn")
 vertical_alignment = 1
+
+[node name="VSeparator" type="VSeparator" parent="HSplitContainer/VBoxContainer/HBoxContainer"]
+layout_mode = 2
+
+[node name="FontSizeMenuButton" type="MenuButton" parent="HSplitContainer/VBoxContainer/HBoxContainer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(80, 0)
+layout_mode = 2
+text = "100 %"
+item_count = 5
+popup/item_0/text = "50 %"
+popup/item_0/id = 0
+popup/item_1/text = "75 %"
+popup/item_1/id = 1
+popup/item_2/text = "100 %"
+popup/item_2/id = 2
+popup/item_3/text = "125 %"
+popup/item_3/id = 3
+popup/item_4/text = "150 %"
+popup/item_4/id = 4
+
+[node name="VSeparator2" type="VSeparator" parent="HSplitContainer/VBoxContainer/HBoxContainer"]
+layout_mode = 2
+
+[node name="CursorPosLabel" type="Label" parent="HSplitContainer/VBoxContainer/HBoxContainer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(120, 0)
+layout_mode = 2
+size_flags_vertical = 1
+text = "0 : 0"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="VSeparator3" type="VSeparator" parent="HSplitContainer/VBoxContainer/HBoxContainer"]
+layout_mode = 2
+
+[node name="CodeSearchEdit" type="LineEdit" parent="HSplitContainer/VBoxContainer/HBoxContainer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(200, 0)
+layout_mode = 2
+placeholder_text = "搜索代码"
