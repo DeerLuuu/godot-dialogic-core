@@ -70,6 +70,7 @@ func get_dialog_text(text_index : int) -> String:
 				if t == text_index:
 					dialogic_text_index = t
 					dialogic_text = order_text_dic[p][r][t]
+					process_metadata(dialogic_para, dialogic_role, dialogic_text)
 					return order_text_dic[p][r][t]
 			return TEXT_IS_FINAL
 	dialogic_para = ""
@@ -77,6 +78,22 @@ func get_dialog_text(text_index : int) -> String:
 	dialogic_text = ""
 	dialogic_text_index = 0
 	return ""
+
+func process_metadata(_para : String, _role : String, _text : String) -> void:
+	for i in dic[_para][_role]:
+		if i.has(_text):
+			var meta_list : Array = i[i.keys()[0]]
+			for meta in meta_list:
+				if meta.has("set"):
+					var meta_str : String = meta["set"]
+					var set_var_name : String = meta_str.get_slice(",", 0).erase(0, 1)
+					var set_var_value = meta_str.get_slice(",", 1).erase(meta_str.get_slice(",", 1).length()-1, 1)
+					var ex : Expression = Expression.new()
+					var _global_value : Dictionary = global_value
+					ex.parse(str(_global_value[set_var_name]) + set_var_value)
+					_global_value[set_var_name] = ex.execute()
+					global_value = _global_value
+
 
 func get_next_text() -> String:
 	var _text : String
@@ -91,6 +108,13 @@ func get_next_text() -> String:
 func get_previous_text() -> String:
 	dialogic_text_index -= 1
 	return get_dialog_text(dialogic_text_index)
+
+func declare_global_var() -> void:
+	for i : String in var_dic:
+		if i == "_global":
+			for _global_var : String in var_dic["_global"]:
+				var global_var_parts : Array = _global_var.split(",")
+				global_value[global_var_parts[0].erase(0, 1)] = float(global_var_parts[1])
 
 func read_ddc_file(file_path : String) -> void:
 	if file_path.get_extension() != "ddc":
@@ -252,23 +276,27 @@ func get_order_text_dic(code_rows : Array) -> Dictionary:
 		row = row.strip_edges(false)
 		var code_parts : Array = row.split(" ")
 		code_parts[0] = code_parts[0].split("\t")[-1]
+		if code_parts[-1] == ":":
+			code_parts.pop_back()
 		if code_parts.has("_para"):
-			para = code_parts[-1]
+			para = erase_end(code_parts[-1])
 			continue
 		if  code_parts.has("_role"):
-			role = code_parts[-1]
+			role = erase_end(code_parts[-1])
 			continue
 		if not code_parts.has("text"): continue
 		text_index += 1
+		var _text : String = code_parts[-1]
+		_text = erase_end(_text).strip_edges(false, true)
 		if not _order_text_dic.has(para):
-			_order_text_dic[para] = {role : {text_index : code_parts[-1]}}
+			_order_text_dic[para] = {role : {text_index : _text}}
 			continue
 		if not _order_text_dic[para].has(role):
-			_order_text_dic[para][role] = {text_index : code_parts[-1]}
+			_order_text_dic[para][role] = {text_index : _text}
 			continue
 		if not _order_text_dic[para][role].size() > 0:
-			_order_text_dic[para][role][text_index] = code_parts[-1]
+			_order_text_dic[para][role][text_index] = _text
 			continue
-		_order_text_dic[para][role][text_index] = code_parts[-1]
+		_order_text_dic[para][role][text_index] = _text
 	return _order_text_dic
 #endregion
