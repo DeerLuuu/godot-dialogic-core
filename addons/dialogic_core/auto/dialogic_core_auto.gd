@@ -13,6 +13,7 @@ enum CodeKeyType{
 	END = -999,
 	CONTINUE = -888
 }
+const TEXT_IS_FINAL : String = "__text__is__final__"
 #endregion
 
 # TODO 对话核心自动加载 ===============>变 量<===============
@@ -25,7 +26,11 @@ var local_value : Dictionary = {}
 var dialogic_para : String
 var dialogic_role : String
 var dialogic_text : String
-var dialogic_text_index : int
+var dialogic_text_index : int:
+	set(v):
+		dialogic_text_index =  v
+		if dialogic_text_index <= 0:
+			dialogic_text_index = 0
 
 var code_arr : Array
 
@@ -49,6 +54,12 @@ var is_choice : bool = false
 # TODO 对话核心自动加载 ===============>工具方法<===============
 #region 工具方法
 func get_frist_text() -> String:
+	var _text : String
+	dialogic_text_index = 1
+	_text = get_dialog_text(dialogic_text_index)
+	return _text
+
+func get_dialog_text(text_index : int) -> String:
 	for p in order_text_dic:
 		if p == "": return ""
 		dialogic_para = p
@@ -56,28 +67,30 @@ func get_frist_text() -> String:
 			if r == "": return ""
 			dialogic_role = r
 			for t in order_text_dic[p][r]:
-				if t == 1:
+				if t == text_index:
 					dialogic_text_index = t
 					dialogic_text = order_text_dic[p][r][t]
 					return order_text_dic[p][r][t]
+			return TEXT_IS_FINAL
 	dialogic_para = ""
 	dialogic_role = ""
 	dialogic_text = ""
-	dialogic_text_index = 1
+	dialogic_text_index = 0
 	return ""
 
 func get_next_text() -> String:
-	if order_text_dic[dialogic_para][dialogic_role].size() <= dialogic_text_index: return ""
+	var _text : String
 	dialogic_text_index += 1
-	return order_text_dic[dialogic_para][dialogic_role][dialogic_text_index]
+	_text = get_dialog_text(dialogic_text_index)
+	if _text == TEXT_IS_FINAL:
+		dialogic_text_index -= 1
+		_text = get_dialog_text(dialogic_text_index)
+		return _text
+	return _text
 
 func get_previous_text() -> String:
-	if dialogic_text_index <= 1:
-		dialogic_text_index = 1
-		return order_text_dic[dialogic_para][dialogic_role][dialogic_text_index]
-
 	dialogic_text_index -= 1
-	return order_text_dic[dialogic_para][dialogic_role][dialogic_text_index]
+	return get_dialog_text(dialogic_text_index)
 
 func read_ddc_file(file_path : String) -> void:
 	if file_path.get_extension() != "ddc":

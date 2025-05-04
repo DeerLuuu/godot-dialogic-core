@@ -86,8 +86,10 @@ unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
 allow_reselect = true
-item_count = 1
+item_count = 3
 item_0/text = "new_ddc.ddc"
+item_1/text = "new_ddc2.ddc"
+item_2/text = "new_ddc3.ddc"
 
 [node name="CreateScriptButton" type="Button" parent="HSplitContainer/Slider"]
 unique_name_in_owner = true
