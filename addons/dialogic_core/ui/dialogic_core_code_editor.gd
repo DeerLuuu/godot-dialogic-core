@@ -54,6 +54,17 @@ var code_standard_completions : Array = ["condition", "else", "elif", "goto", "c
 var code_other_completions : Array = ["emote", "voice", "text"]
 # VAR 报错文字容器
 var err_label: Label
+
+# NOTE 一下变量为解析相关的变量
+var dic : Dictionary
+var var_dic : Dictionary
+var current_para : String = ""
+var current_role : String = ""
+var current_text : String = ""
+var current_choice : String = ""
+var current_text_meta_index : int = -1
+var current_choice_index : int = -1
+var is_choice : bool = false
 #endregion
 
 # TODO 对话核心代码编辑器 ===============>虚方法<===============
@@ -146,16 +157,10 @@ func _on_code_edit_text_changed() -> void:
 	not_err = code_err_parser(code_end_or_spell_error_detection)
 	not_err = code_err_parser(code_value_error_detection)
 
-	if not_err: code_parser()
-
-# FUNC 代码错误解析器
-func code_err_parser(err_func : Callable) -> bool:
-	for i in code_rows.size():
-		var error : CodeError = err_func.call(code_rows[i])
-		if error == CodeError.OK: continue
-		code_edit.set_line_background_color(i, Color("663e3a"))
-		return false
-	return true
+	if not_err:
+		var_dic = {}
+		dic = {}
+		code_parser()
 
 # FUNC 代码编辑器中触发自动补全时的方法
 func _on_code_edit_code_completion_requested() -> void:
@@ -188,36 +193,87 @@ func _on_code_search_edit_text_submitted(new_text: String) -> void:
 
 # TODO 对话核心代码编辑器 ===============>工具方法<===============
 #region 工具方法
+# FUNC 代码错误解析器
+func code_err_parser(err_func : Callable) -> bool:
+	for i in code_rows.size():
+		var error : CodeError = err_func.call(code_rows[i])
+		if error == CodeError.OK: continue
+		code_edit.set_line_background_color(i, Color("663e3a"))
+		return false
+	return true
+
 # FUNC 过滤:的方法
 func erase_end(code_part : String) -> String:
 	if code_part.ends_with(":"):
 		code_part = code_part.erase(code_part.length()-1)
 	return code_part
+
+func get_full_value_in_code_part(code_parts : Array, key : String, end_code : String = "", interval_code : String = "") -> String:
+	var code_part : String
+	for i : String in code_parts:
+		if i == "": continue
+		if i == "\t": continue
+		if i == key: continue
+		code_part += i + interval_code
+		if end_code != "":
+			if i == end_code: break
+			if i.ends_with(end_code): break
+	return code_part
+
 # FUNC 成员关键字解析方法
-func member_key_parser(code_parts : Array, code_part_index : int) -> Array:
+func member_key_parser(code_parts : Array, var_part : Dictionary) -> Array:
+	var is_paser : bool = false
+	for i in ["_global", "_local", "_signal"]:
+		if not code_parts.has(i): continue
+		is_paser = true
+		var code_part : String
+		code_part = get_full_value_in_code_part(code_parts, i)
+		if not var_part.has(i):
+			var_part[i] = []
+		var_part[i].append(code_part)
+		return [var_part, is_paser]
+	return [var_part, is_paser]
+
+# FUNC 主要关键字解析方法
+func main_key_parser(code_parts : Array, code_part_index : int) -> Array:
 	var is_paser : bool = false
 	var code_part : String
 	for i in ["_role", "_para"]:
-		if code_parts.has(i):
-			is_paser = true
-			code_part_index = code_parts.find(i) + 1
-			code_part = code_parts[code_part_index]
-			code_part = erase_end(code_part)
-			return [code_part, is_paser, i]
+		if not code_parts.has(i): continue
+		is_paser = true
+		code_part_index = code_parts.find(i) + 1
+		code_part = code_parts[code_part_index]
+		code_part = erase_end(code_part)
+		return [code_part, is_paser, i]
 	return [code_part, is_paser, "null"]
+
+# FUNC 子成员关键字解析方法
+func child_key_parser(code_parts : Array, code_part_index : int) -> bool:
+	var is_paser : bool = false
+	for i in ["set", "emote", "goto", "time", "voice", "condition", "event", "continue", "end"]:
+		if not code_parts.has(i): continue
+		is_paser = true
+		code_part_index = code_parts.find(i) + 1
+		var code_part : String
+		code_part = get_full_value_in_code_part(code_parts, i)
+		for index in dic[current_para][current_role].size():
+			if dic[current_para][current_role][index].keys()[0] != current_text: continue
+			if is_choice:
+				if i in ["continue", "end"]:
+					dic[current_para][current_role][index][current_text][current_text_meta_index]["choice"][current_choice_index][current_choice].append(CodeKeyType.CONTINUE if i == "continue" else CodeKeyType.END)
+					continue
+				dic[current_para][current_role][index][current_text][current_text_meta_index]["choice"][current_choice_index][current_choice].append({i : code_part})
+				continue
+			if i in ["continue", "end"]:
+				dic[current_para][current_role][index][current_text].append(CodeKeyType.CONTINUE if i == "continue" else CodeKeyType.END)
+				continue
+			dic[current_para][current_role][index][current_text].append({i : code_part})
+			break
+		return is_paser
+	return is_paser
+
 # FUNC 代码解析器
 func code_parser() -> void:
-	var dic : Dictionary
-	var var_part : Dictionary
-	var current_para : String = ""
-	var current_role : String = ""
-	var current_text : String = ""
-	var current_choice : String = ""
-	var current_text_meta_index : int = -1
-	var current_choice_index : int = -1
-
-	var is_choice : bool = false
-
 	for code_row in code_rows:
 		if code_row.dedent() == "": continue
 		var code_parts : Array = code_row.split(" ")
@@ -228,25 +284,18 @@ func code_parser() -> void:
 		code_parts[0] = code_parts[0].split("\t")[-1]
 
 		# NOTE 解析成员关键字 global local signal
-		for i in ["_global", "_local", "_signal"]:
-			if not code_parts.has(i): continue
-			var code_part : String
-			for key : String in code_parts:
-				if key == "": continue
-				if key == "\t": continue
-				if key == i: continue
-				code_part += key
-			var_part[i] = code_part
-			continue
+		var member_parser_arr : Array = member_key_parser(code_parts, var_dic)
+		var_dic = member_parser_arr[0]
+		if member_parser_arr[1]: continue
 
 		# NOTE 解析段落关键字与角色关键字
-		var member_parser_arr : Array = member_key_parser(code_parts, code_part_index)
-		match member_parser_arr[2]:
+		var main_parser_arr : Array = main_key_parser(code_parts, code_part_index)
+		match main_parser_arr[2]:
 			"_para" :
-				current_para = member_parser_arr[0]
+				current_para = main_parser_arr[0]
 			"_role" :
-				current_role = member_parser_arr[0]
-		if member_parser_arr[1]: continue
+				current_role = main_parser_arr[0]
+		if main_parser_arr[1]: continue
 
 		# NOTE 解析文本关键字
 		if code_parts.has("text"):
@@ -283,147 +332,8 @@ func code_parser() -> void:
 					break
 			continue
 
-		# NOTE 解析赋值关键字
-		if code_parts.has("set"):
-			code_part_index = code_parts.find("set") + 1
-			var code_part : String
-			for key : String in code_parts:
-				if key == "": continue
-				if key == "\t": continue
-				if key == "set": continue
-				code_part += key
-			for i in dic[current_para][current_role].size():
-				var dic_current_texts : Dictionary = dic[current_para][current_role][i]
-				if dic_current_texts.keys()[0] == current_text:
-					if is_choice:
-						dic_current_texts[current_text][current_text_meta_index]["choice"][current_choice_index][current_choice].append({"set" : code_part})
-						continue
-					dic_current_texts[current_text].append({"set" : code_part})
-					break
-			continue
-
-		# NOTE 解析条件关键字
-		if code_parts.has("condition"):
-			code_part_index = code_parts.find("condition") + 1
-			var code_part : String
-			for key : String in code_parts:
-				if key == "": continue
-				if key == "\t": continue
-				if key == "condition": continue
-				code_part += key
-			for i in dic[current_para][current_role].size():
-				var dic_current_texts : Dictionary = dic[current_para][current_role][i]
-				if dic_current_texts.keys()[0] == current_text:
-					if is_choice:
-						dic_current_texts[current_text][current_text_meta_index]["choice"][current_choice_index][current_choice].append({"condition" : code_part})
-						continue
-					dic_current_texts[current_text].append({"condition" : code_part})
-					break
-			continue
-
-		# NOTE 解析事件关键字
-		if code_parts.has("event"):
-			code_part_index = code_parts.find("event") + 1
-			var code_part : String
-			for key : String in code_parts:
-				if key == "": continue
-				if key == "\t": continue
-				if key == "event": continue
-				code_part += key
-			for i in dic[current_para][current_role].size():
-				var dic_current_texts : Dictionary = dic[current_para][current_role][i]
-				if dic_current_texts.keys()[0] == current_text:
-					if is_choice:
-						dic_current_texts[current_text][current_text_meta_index]["choice"][current_choice_index][current_choice].append({"event" : code_part})
-						continue
-					dic_current_texts[current_text].append({"event" : code_part})
-					break
-			continue
-
-		# NOTE 解析表情关键字
-		if code_parts.has("emote"):
-			code_part_index = code_parts.find("emote") + 1
-			var code_part : String = code_parts[code_part_index]
-			for i in dic[current_para][current_role].size():
-				var dic_current_texts : Dictionary = dic[current_para][current_role][i]
-				if dic_current_texts.keys()[0] == current_text:
-					if is_choice:
-						dic_current_texts[current_text][current_text_meta_index]["choice"][current_choice_index][current_choice].append({"emote" : code_part})
-						continue
-					dic_current_texts[current_text].append({"emote" : code_part})
-					break
-			continue
-
-		# NOTE 解析跳转关键字
-		if code_parts.has("goto"):
-			code_part_index = code_parts.find("goto") + 1
-			var code_part : String = code_parts[code_part_index]
-			for i in dic[current_para][current_role].size():
-				var dic_current_texts : Dictionary = dic[current_para][current_role][i]
-				if dic_current_texts.keys()[0] == current_text:
-					if is_choice:
-						dic_current_texts[current_text][current_text_meta_index]["choice"][current_choice_index][current_choice].append({"goto" : code_part})
-						continue
-					dic_current_texts[current_text].append({"goto" : code_part})
-					break
-			continue
-
-		# NOTE 解析时间关键字
-		if code_parts.has("time"):
-			code_part_index = code_parts.find("time") + 1
-			var code_part : String = code_parts[code_part_index]
-			for i in dic[current_para][current_role].size():
-				var dic_current_texts : Dictionary = dic[current_para][current_role][i]
-				if dic_current_texts.keys()[0] == current_text:
-					if is_choice:
-						dic_current_texts[current_text][current_text_meta_index]["choice"][current_choice_index][current_choice].append({"time" : code_part})
-						continue
-					dic_current_texts[current_text].append({"time" : code_part})
-					break
-			continue
-
-		# NOTE 解析声音关键字
-		if code_parts.has("voice"):
-			code_part_index = code_parts.find("voice") + 1
-			var code_part : String = code_parts[code_part_index]
-			for i in dic[current_para][current_role].size():
-				var dic_current_texts : Dictionary = dic[current_para][current_role][i]
-				if dic_current_texts.keys()[0] == current_text:
-					if dic_current_texts.keys()[0] == current_text:
-						if is_choice:
-							dic_current_texts[current_text][current_text_meta_index]["choice"][current_choice_index][current_choice].append({"voice" : code_part})
-							continue
-					dic_current_texts[current_text].append({"voice" : code_part})
-					break
-			continue
-
-		# NOTE 解析声音关键字
-		if code_parts.has("continue"):
-			if tab_num == 3:
-				is_choice = false
-			for i in dic[current_para][current_role].size():
-				var dic_current_texts : Dictionary = dic[current_para][current_role][i]
-				if dic_current_texts.keys()[0] == current_text:
-					if is_choice:
-						dic_current_texts[current_text][current_text_meta_index]["choice"][current_choice_index][current_choice].append(CodeKeyType.CONTINUE)
-						continue
-					dic_current_texts[current_text].append(CodeKeyType.CONTINUE)
-					break
-			continue
-
-		# NOTE 解析结束关键字
-		if code_parts.has("end"):
-			if tab_num == 3:
-				is_choice = false
-			for i in dic[current_para][current_role].size():
-				var dic_current_texts : Dictionary = dic[current_para][current_role][i]
-				if dic_current_texts.keys()[0] == current_text:
-					if is_choice:
-						dic_current_texts[current_text][current_text_meta_index]["choice"][current_choice_index][current_choice].append(CodeKeyType.END)
-						continue
-					dic_current_texts[current_text].append(CodeKeyType.END)
-					break
-			continue
+		# NOTE 解析子成员关键字
+		if child_key_parser(code_parts, code_part_index): continue
 	print(dic)
 
 # FUNC 代码结尾、拼写错误检测器
@@ -530,12 +440,7 @@ func code_value_error_detection(code_row : String) -> CodeError:
 
 			var code_part : String
 
-			for key : String in code_parts:
-				if key == "": continue
-				if key == "\t": continue
-				if key == i: continue
-				code_part += key
-				if key.ends_with("]"): break
+			code_part = get_full_value_in_code_part(code_parts, i, "]")
 
 			if code_part == "":
 				code_printerr("你可能缺失了参数，请检查代码第%s行%s列" % [code_edit.get_caret_line() + 1, code_edit.get_caret_column() + 1])
@@ -554,12 +459,7 @@ func code_value_error_detection(code_row : String) -> CodeError:
 
 			var code_part : String
 
-			for key : String in code_parts:
-				if key == "": continue
-				if key == "\t": continue
-				if key == i: continue
-				if key == ":": continue
-				code_part += key + " "
+			code_part = get_full_value_in_code_part(code_parts, i, "", " ")
 
 			if code_part.contains(":"):
 				code_part = code_part.left(code_part.length() - 2)
