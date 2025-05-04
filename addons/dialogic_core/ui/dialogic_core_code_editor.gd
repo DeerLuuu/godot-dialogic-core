@@ -54,8 +54,6 @@ var code_standard_completions : Array = ["condition", "else", "elif", "goto", "c
 var code_other_completions : Array = ["emote", "voice", "text"]
 # VAR 报错文字容器
 var err_label: Label
-# VAR 无报错
-var not_err : bool = true
 #endregion
 
 # TODO 对话核心代码编辑器 ===============>虚方法<===============
@@ -136,28 +134,28 @@ func _on_code_edit_caret_changed() -> void:
 
 # FUNC 代码编辑器中文本改变时触发的方法
 func _on_code_edit_text_changed() -> void:
+	var not_err : bool = true
+
 	code_rows = code_edit.text.split("\n")
 	code_edit.request_code_completion()
-	code_err_clear()
 
 	for i in code_rows.size():
 		code_edit.set_line_background_color(i, Color("252525"))
 
-	not_err = true
-
-	for i in code_rows.size():
-		var error : CodeError = code_end_or_spell_error_detection(code_rows[i])
-		if error == CodeError.OK: continue
-		code_edit.set_line_background_color(i, Color("663e3a"))
-		not_err = false
-
-	for i in code_rows.size():
-		var error : CodeError = code_value_error_detection(code_rows[i])
-		if error == CodeError.OK: continue
-		code_edit.set_line_background_color(i, Color("663e3a"))
-		not_err = false
+	code_err_clear()
+	not_err = code_err_parser(code_end_or_spell_error_detection)
+	not_err = code_err_parser(code_value_error_detection)
 
 	if not_err: code_parser()
+
+# FUNC 代码错误解析器
+func code_err_parser(err_func : Callable) -> bool:
+	for i in code_rows.size():
+		var error : CodeError = err_func.call(code_rows[i])
+		if error == CodeError.OK: continue
+		code_edit.set_line_background_color(i, Color("663e3a"))
+		return false
+	return true
 
 # FUNC 代码编辑器中触发自动补全时的方法
 func _on_code_edit_code_completion_requested() -> void:
@@ -190,9 +188,27 @@ func _on_code_search_edit_text_submitted(new_text: String) -> void:
 
 # TODO 对话核心代码编辑器 ===============>工具方法<===============
 #region 工具方法
+# FUNC 过滤:的方法
+func erase_end(code_part : String) -> String:
+	if code_part.ends_with(":"):
+		code_part = code_part.erase(code_part.length()-1)
+	return code_part
+# FUNC 成员关键字解析方法
+func member_key_parser(code_parts : Array, code_part_index : int) -> Array:
+	var is_paser : bool = false
+	var code_part : String
+	for i in ["_role", "_para"]:
+		if code_parts.has(i):
+			is_paser = true
+			code_part_index = code_parts.find(i) + 1
+			code_part = code_parts[code_part_index]
+			code_part = erase_end(code_part)
+			return [code_part, is_paser, i]
+	return [code_part, is_paser, "null"]
 # FUNC 代码解析器
 func code_parser() -> void:
 	var dic : Dictionary
+	var var_part : Dictionary
 	var current_para : String = ""
 	var current_role : String = ""
 	var current_text : String = ""
@@ -201,6 +217,7 @@ func code_parser() -> void:
 	var current_choice_index : int = -1
 
 	var is_choice : bool = false
+
 	for code_row in code_rows:
 		if code_row.dedent() == "": continue
 		var code_parts : Array = code_row.split(" ")
@@ -210,64 +227,33 @@ func code_parser() -> void:
 		tab_num = code_parts[0].count("\t")
 		code_parts[0] = code_parts[0].split("\t")[-1]
 
-		# NOTE 解析成员关键字 global
-		if code_parts.has("_global"):
+		# NOTE 解析成员关键字 global local signal
+		for i in ["_global", "_local", "_signal"]:
+			if not code_parts.has(i): continue
 			var code_part : String
 			for key : String in code_parts:
 				if key == "": continue
 				if key == "\t": continue
-				if key == "_global": continue
+				if key == i: continue
 				code_part += key
-			#print(code_part)
+			var_part[i] = code_part
 			continue
 
-		# NOTE 解析成员关键字 local
-		if code_parts.has("_local"):
-			var code_part : String
-			for key : String in code_parts:
-				if key == "": continue
-				if key == "\t": continue
-				if key == "_local": continue
-				code_part += key
-			#print(code_part)
-			continue
-
-		# NOTE 解析成员关键字 signal
-		if code_parts.has("_signal"):
-			var code_part : String
-			for key : String in code_parts:
-				if key == "": continue
-				if key == "\t": continue
-				if key == "_signal": continue
-				code_part += key
-			#print(code_part)
-			continue
-
-		# NOTE 解析段落关键字
-		if code_parts.has("_para"):
-			code_part_index = code_parts.find("_para") + 1
-			var code_part : String = code_parts[code_part_index]
-			if code_part.ends_with(":"):
-				code_part = code_part.erase(code_part.length()-1)
-			current_para = code_part
-			continue
-
-		# NOTE 解析角色关键字
-		if code_parts.has("_role"):
-			code_part_index = code_parts.find("_role") + 1
-			var code_part : String = code_parts[code_part_index]
-			if code_part.ends_with(":"):
-				code_part = code_part.erase(code_part.length()-1)
-			current_role = code_part
-			continue
+		# NOTE 解析段落关键字与角色关键字
+		var member_parser_arr : Array = member_key_parser(code_parts, code_part_index)
+		match member_parser_arr[2]:
+			"_para" :
+				current_para = member_parser_arr[0]
+			"_role" :
+				current_role = member_parser_arr[0]
+		if member_parser_arr[1]: continue
 
 		# NOTE 解析文本关键字
 		if code_parts.has("text"):
 			is_choice = false
 			code_part_index = code_parts.find("text") + 1
 			var code_part : String = code_parts[code_part_index]
-			if code_part.ends_with(":"):
-				code_part = code_part.erase(code_part.length()-1)
+			code_part = erase_end(code_part)
 			current_text = code_part
 			if not dic.has(current_para):
 				dic[current_para] = {current_role : []}
@@ -281,8 +267,7 @@ func code_parser() -> void:
 			is_choice = false
 			code_part_index = code_parts.find("choice") + 1
 			var code_part : String = code_parts[code_part_index]
-			if code_part.ends_with(":"):
-				code_part = code_part.erase(code_part.length()-1)
+			code_part = erase_end(code_part)
 			current_choice = code_part
 			for i in dic[current_para][current_role].size():
 				var dic_current_texts : Dictionary = dic[current_para][current_role][i]
@@ -456,8 +441,6 @@ func code_end_or_spell_error_detection(code_row : String) -> CodeError:
 
 	tab_num = code_parts[0].count("\t")
 	code_parts[0] = has_tab_part.split("\t")[-1]
-
-	print(code_parts)
 
 	for i in has_end_keys:
 		if code_parts.has(i + ":"):
