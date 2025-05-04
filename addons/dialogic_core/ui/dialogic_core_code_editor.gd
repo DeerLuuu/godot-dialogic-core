@@ -24,10 +24,14 @@ enum CodeKeyType{
 	END = -999,
 	CONTINUE = -888
 }
+const CREATE_SCRIPT_PANEL_CONTAINER = preload("res://addons/dialogic_core/ui/create_script_panel_container.tscn")
 #endregion
 
 # TODO 对话核心代码编辑器 ===============>变 量<===============
 #region 变量
+var editor : EditorPlugin
+# VAR 创建代码按钮
+var create_script_button: Button
 # VAR 侧边栏容器
 var slider: VBoxContainer
 # VAR 字体大小菜单按钮
@@ -54,28 +58,26 @@ var code_standard_completions : Array = ["condition", "else", "elif", "goto", "c
 var code_other_completions : Array = ["emote", "voice", "text"]
 # VAR 报错文字容器
 var err_label: Label
+var file_item_list: ItemList
 
-# NOTE 一下变量为解析相关的变量
-var dic : Dictionary
-var var_dic : Dictionary
-var current_para : String = ""
-var current_role : String = ""
-var current_text : String = ""
-var current_choice : String = ""
-var current_text_meta_index : int = -1
-var current_choice_index : int = -1
-var is_choice : bool = false
+var scripts : Array
+var script_dic : Dictionary
+
+var current_edit_ddc_path : String
+
 #endregion
 
 # TODO 对话核心代码编辑器 ===============>虚方法<===============
 #region 常用的虚方法
 func _ready() -> void:
+	create_script_button = %CreateScriptButton
 	slider = %Slider
 	font_size_menu_button = %FontSizeMenuButton
 	code_search_edit = %CodeSearchEdit
 	err_label = %ErrLabel
 	cursor_pos_label = %CursorPosLabel
 	show_or_hide_slider_button = %ShowOrHideSliderButton
+	file_item_list = %FileItemList
 
 	highlighter = highlighter_create()
 	code_member_completions.sort()
@@ -99,10 +101,14 @@ func _ready() -> void:
 	code_edit.add_theme_font_override("font", load("res://JetBrainsMono-ExtraBoldItalic.ttf"))
 	code_edit.add_theme_font_size_override("font_size", 15)
 
+	read_ddc_file()
+
 	# NOTE 信号链接初始化
 	font_size_menu_button.get_popup().id_pressed.connect(_on_font_size_menu_button_popup_id_pressed)
 	code_search_edit.text_submitted.connect(_on_code_search_edit_text_submitted)
 	show_or_hide_slider_button.pressed.connect(_on_show_or_hide_slider_button_pressed)
+	file_item_list.item_selected.connect(_on_file_item_list_item_selected)
+	create_script_button.pressed.connect(_on_create_script_button_pressed)
 
 	code_edit.code_completion_requested.connect(_on_code_edit_code_completion_requested)
 	code_edit.text_changed.connect(_on_code_edit_text_changed)
@@ -111,6 +117,34 @@ func _ready() -> void:
 
 # TODO 对话核心代码编辑器 ===============>信号链接方法<===============
 #region 信号链接方法
+# FUNC 创建脚本按钮的方法
+func _on_create_script_button_pressed() -> void:
+	var create_script_panel_container = CREATE_SCRIPT_PANEL_CONTAINER.instantiate()
+	create_script_panel_container.editor = editor
+	var window : Window = Window.new()
+	window.transient = true
+	window.transparent = true
+	window.add_child(create_script_panel_container)
+	add_child(window)
+	create_script_panel_container.close.connect(func(): window.queue_free())
+	window.close_requested.connect(func(): window.queue_free())
+	window.popup_centered(create_script_panel_container.size)
+
+# FUNC 保存ddc文件
+func _on_scene_saved(filepath: String) -> void:
+	if current_edit_ddc_path != "":
+		var file = FileAccess.open(current_edit_ddc_path, FileAccess.WRITE)
+		file.store_string(code_edit.text)
+	read_ddc_file()
+
+# FUNC 文件列表中的文件被点击时的方法
+func _on_file_item_list_item_selected(index: int) -> void:
+	var file_path : String = script_dic[file_item_list.get_item_text(index)]
+	current_edit_ddc_path = file_path
+	var file = FileAccess.open(file_path, FileAccess.READ)
+	code_edit.text = file.get_as_text()
+	code_edit.show()
+
 # FUNC 显示或隐藏侧边栏按钮激活方法
 func _on_show_or_hide_slider_button_pressed() -> void:
 	if show_or_hide_slider_button.text == "<":
@@ -157,10 +191,6 @@ func _on_code_edit_text_changed() -> void:
 	not_err = code_err_parser(code_end_or_spell_error_detection)
 	not_err = code_err_parser(code_value_error_detection)
 
-	if not_err:
-		var_dic = {}
-		dic = {}
-		code_parser()
 
 # FUNC 代码编辑器中触发自动补全时的方法
 func _on_code_edit_code_completion_requested() -> void:
@@ -193,6 +223,37 @@ func _on_code_search_edit_text_submitted(new_text: String) -> void:
 
 # TODO 对话核心代码编辑器 ===============>工具方法<===============
 #region 工具方法
+# FUNC 读取项目中的ddc文件
+func read_ddc_file() -> void:
+	scripts = get_scripte_list("res://")
+	file_item_list.clear()
+	for i : String in scripts:
+		var file_name_parts : Array = i.split("/")
+		var file_name : String = file_name_parts[-1]
+		script_dic[file_name] = i
+		file_item_list.add_item(file_name)
+
+# TODO 插件脚本列表的方法
+func get_scripte_list(root_path : String) -> Array:
+	var scripts := []
+	var dir = DirAccess.open(root_path)
+
+	if dir:
+		dir.list_dir_begin()
+		var file_name = dir.get_next()
+		while file_name != "":
+			var full_path = root_path.path_join(file_name)
+
+			if dir.current_is_dir():
+				# 递归处理子目录
+				scripts.append_array(get_scripte_list(full_path))
+			else:
+				if file_name.get_extension() == "ddc":
+					scripts.append(full_path)
+
+			file_name = dir.get_next()
+	return scripts
+
 # FUNC 代码错误解析器
 func code_err_parser(err_func : Callable) -> bool:
 	for i in code_rows.size():
@@ -201,12 +262,6 @@ func code_err_parser(err_func : Callable) -> bool:
 		code_edit.set_line_background_color(i, Color("663e3a"))
 		return false
 	return true
-
-# FUNC 过滤:的方法
-func erase_end(code_part : String) -> String:
-	if code_part.ends_with(":"):
-		code_part = code_part.erase(code_part.length()-1)
-	return code_part
 
 func get_full_value_in_code_part(code_parts : Array, key : String, end_code : String = "", interval_code : String = "") -> String:
 	var code_part : String
@@ -219,122 +274,6 @@ func get_full_value_in_code_part(code_parts : Array, key : String, end_code : St
 			if i == end_code: break
 			if i.ends_with(end_code): break
 	return code_part
-
-# FUNC 成员关键字解析方法
-func member_key_parser(code_parts : Array, var_part : Dictionary) -> Array:
-	var is_paser : bool = false
-	for i in ["_global", "_local", "_signal"]:
-		if not code_parts.has(i): continue
-		is_paser = true
-		var code_part : String
-		code_part = get_full_value_in_code_part(code_parts, i)
-		if not var_part.has(i):
-			var_part[i] = []
-		var_part[i].append(code_part)
-		return [var_part, is_paser]
-	return [var_part, is_paser]
-
-# FUNC 主要关键字解析方法
-func main_key_parser(code_parts : Array, code_part_index : int) -> Array:
-	var is_paser : bool = false
-	var code_part : String
-	for i in ["_role", "_para"]:
-		if not code_parts.has(i): continue
-		is_paser = true
-		code_part_index = code_parts.find(i) + 1
-		code_part = code_parts[code_part_index]
-		code_part = erase_end(code_part)
-		return [code_part, is_paser, i]
-	return [code_part, is_paser, "null"]
-
-# FUNC 子成员关键字解析方法
-func child_key_parser(code_parts : Array, code_part_index : int) -> bool:
-	var is_paser : bool = false
-	for i in ["set", "emote", "goto", "time", "voice", "condition", "event", "continue", "end"]:
-		if not code_parts.has(i): continue
-		is_paser = true
-		code_part_index = code_parts.find(i) + 1
-		var code_part : String
-		code_part = get_full_value_in_code_part(code_parts, i)
-		for index in dic[current_para][current_role].size():
-			if dic[current_para][current_role][index].keys()[0] != current_text: continue
-			if is_choice:
-				if i in ["continue", "end"]:
-					dic[current_para][current_role][index][current_text][current_text_meta_index]["choice"][current_choice_index][current_choice].append(CodeKeyType.CONTINUE if i == "continue" else CodeKeyType.END)
-					continue
-				dic[current_para][current_role][index][current_text][current_text_meta_index]["choice"][current_choice_index][current_choice].append({i : code_part})
-				continue
-			if i in ["continue", "end"]:
-				dic[current_para][current_role][index][current_text].append(CodeKeyType.CONTINUE if i == "continue" else CodeKeyType.END)
-				continue
-			dic[current_para][current_role][index][current_text].append({i : code_part})
-			break
-		return is_paser
-	return is_paser
-
-# FUNC 代码解析器
-func code_parser() -> void:
-	for code_row in code_rows:
-		if code_row.dedent() == "": continue
-		var code_parts : Array = code_row.split(" ")
-		var code_part_index : int
-
-		var tab_num : int = 0
-		tab_num = code_parts[0].count("\t")
-		code_parts[0] = code_parts[0].split("\t")[-1]
-
-		# NOTE 解析成员关键字 global local signal
-		var member_parser_arr : Array = member_key_parser(code_parts, var_dic)
-		var_dic = member_parser_arr[0]
-		if member_parser_arr[1]: continue
-
-		# NOTE 解析段落关键字与角色关键字
-		var main_parser_arr : Array = main_key_parser(code_parts, code_part_index)
-		match main_parser_arr[2]:
-			"_para" :
-				current_para = main_parser_arr[0]
-			"_role" :
-				current_role = main_parser_arr[0]
-		if main_parser_arr[1]: continue
-
-		# NOTE 解析文本关键字
-		if code_parts.has("text"):
-			is_choice = false
-			code_part_index = code_parts.find("text") + 1
-			var code_part : String = code_parts[code_part_index]
-			code_part = erase_end(code_part)
-			current_text = code_part
-			if not dic.has(current_para):
-				dic[current_para] = {current_role : []}
-			if not dic[current_para].has(current_role):
-				dic[current_para][current_role] = []
-			dic[current_para][current_role].append({current_text : [{"cls" : CodeKeyType.TEXT}]})
-			continue
-
-		# NOTE 解析选择关键字
-		if code_parts.has("choice"):
-			is_choice = false
-			code_part_index = code_parts.find("choice") + 1
-			var code_part : String = code_parts[code_part_index]
-			code_part = erase_end(code_part)
-			current_choice = code_part
-			for i in dic[current_para][current_role].size():
-				var dic_current_texts : Dictionary = dic[current_para][current_role][i]
-				if dic_current_texts.keys()[0] == current_text:
-					for y in dic_current_texts[current_text].size():
-						current_text_meta_index = y
-						if not dic_current_texts[current_text][y].keys().has("choice"):
-							dic_current_texts[current_text][y]["choice"] = []
-						dic_current_texts[current_text][y]["choice"].append({code_part : []})
-						current_choice_index += 1
-						is_choice = true
-						break
-					break
-			continue
-
-		# NOTE 解析子成员关键字
-		if child_key_parser(code_parts, code_part_index): continue
-	print(dic)
 
 # FUNC 代码结尾、拼写错误检测器
 func code_end_or_spell_error_detection(code_row : String) -> CodeError:

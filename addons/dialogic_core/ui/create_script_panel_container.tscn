@@ -1,0 +1,121 @@
+[gd_scene load_steps=5 format=3 uid="uid://dobje52pgfux1"]
+
+[ext_resource type="Texture2D" uid="uid://bqufdebg5egq0" path="res://addons/dialogic_core/icon/file.svg" id="1_gkogn"]
+[ext_resource type="Script" uid="uid://chxmpdgi1rfw7" path="res://addons/dialogic_core/ui/create_script_panel_container.gd" id="1_lkjuy"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_lkjuy"]
+bg_color = Color(0.145098, 0.145098, 0.145098, 1)
+
+[sub_resource type="LabelSettings" id="LabelSettings_kbmm5"]
+font_size = 24
+
+[node name="CreateScriptPanelContainer" type="PanelContainer"]
+custom_minimum_size = Vector2(500, 0)
+offset_right = 40.0
+offset_bottom = 40.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_lkjuy")
+script = ExtResource("1_lkjuy")
+
+[node name="MarginContainer" type="MarginContainer" parent="."]
+layout_mode = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 8
+
+[node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Label" type="Label" parent="MarginContainer/VBoxContainer"]
+layout_mode = 2
+text = "新建文件"
+label_settings = SubResource("LabelSettings_kbmm5")
+horizontal_alignment = 1
+
+[node name="HBoxContainer" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+
+[node name="Label" type="Label" parent="MarginContainer/VBoxContainer/HBoxContainer"]
+layout_mode = 2
+text = "文件名称"
+
+[node name="FileNameEdit" type="LineEdit" parent="MarginContainer/VBoxContainer/HBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "new_ddc"
+placeholder_text = "请输入脚本名称"
+
+[node name="HBoxContainer2" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+
+[node name="Label" type="Label" parent="MarginContainer/VBoxContainer/HBoxContainer2"]
+layout_mode = 2
+text = "文件类型"
+
+[node name="FileTypeOptionButton" type="OptionButton" parent="MarginContainer/VBoxContainer/HBoxContainer2"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+selected = 0
+item_count = 1
+popup/item_0/text = "ddc文件"
+popup/item_0/id = 0
+
+[node name="HBoxContainer3" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+
+[node name="Label" type="Label" parent="MarginContainer/VBoxContainer/HBoxContainer3"]
+layout_mode = 2
+text = "存储路径"
+
+[node name="FilePathEdit" type="LineEdit" parent="MarginContainer/VBoxContainer/HBoxContainer3"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "请选择存储路径"
+
+[node name="FileButton" type="Button" parent="MarginContainer/VBoxContainer/HBoxContainer3"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(36, 36)
+layout_mode = 2
+icon = ExtResource("1_gkogn")
+icon_alignment = 1
+expand_icon = true
+
+[node name="PanelContainer" type="PanelContainer" parent="MarginContainer/VBoxContainer"]
+custom_minimum_size = Vector2(0, 100)
+layout_mode = 2
+
+[node name="Label" type="RichTextLabel" parent="MarginContainer/VBoxContainer/PanelContainer"]
+custom_minimum_size = Vector2(0, 24)
+layout_mode = 2
+bbcode_enabled = true
+
+[node name="HBoxContainer4" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+size_flags_horizontal = 4
+
+[node name="ConfirmButton" type="Button" parent="MarginContainer/VBoxContainer/HBoxContainer4"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(100, 0)
+layout_mode = 2
+text = "确定"
+
+[node name="CancelButton" type="Button" parent="MarginContainer/VBoxContainer/HBoxContainer4"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(100, 0)
+layout_mode = 2
+text = "取消"
+
+[connection signal="text_changed" from="MarginContainer/VBoxContainer/HBoxContainer/FileNameEdit" to="." method="_on_file_name_edit_text_changed"]
+[connection signal="item_selected" from="MarginContainer/VBoxContainer/HBoxContainer2/FileTypeOptionButton" to="." method="_on_file_type_option_button_item_selected"]
+[connection signal="text_changed" from="MarginContainer/VBoxContainer/HBoxContainer3/FilePathEdit" to="." method="_on_file_path_edit_text_changed"]
+[connection signal="pressed" from="MarginContainer/VBoxContainer/HBoxContainer3/FileButton" to="." method="_on_file_button_pressed"]
+[connection signal="pressed" from="MarginContainer/VBoxContainer/HBoxContainer4/ConfirmButton" to="." method="_on_confirm_button_pressed"]
+[connection signal="pressed" from="MarginContainer/VBoxContainer/HBoxContainer4/CancelButton" to="." method="_on_cancel_button_pressed"]
