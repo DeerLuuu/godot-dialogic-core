@@ -2,7 +2,8 @@ extends Node
 
 # TODO 对话核心自动加载 ===============>信 号<===============
 #region 信号
-
+signal next_text(_text : String)
+signal previous_text(_text : String)
 #endregion
 
 # TODO 对话核心自动加载 ===============>常 量<===============
@@ -23,6 +24,7 @@ var global_value : Dictionary = {}
 # VAR 临时属性
 var local_value : Dictionary = {}
 
+var last_meta_dic : Dictionary
 var dialogic_para : String
 var dialogic_role : String
 var dialogic_text : String
@@ -53,12 +55,23 @@ var is_choice : bool = false
 
 # TODO 对话核心自动加载 ===============>工具方法<===============
 #region 工具方法
+# 获取ddc文件第一句文本
 func get_frist_text() -> String:
 	var _text : String
 	dialogic_text_index = 1
 	_text = get_dialog_text(dialogic_text_index)
 	return _text
 
+# 获取段落第一句文本
+func get_para_frist_text_index(para : String) -> int:
+
+	for r in order_text_dic[para]:
+		for t in order_text_dic[para][r]:
+			last_meta_dic = {}
+			return t
+	return -1
+
+# FUNC 通过文本索引获取对应文本并处理元数据
 func get_dialog_text(text_index : int) -> String:
 	for p in order_text_dic:
 		if p == "": return ""
@@ -70,45 +83,78 @@ func get_dialog_text(text_index : int) -> String:
 				if t == text_index:
 					dialogic_text_index = t
 					dialogic_text = order_text_dic[p][r][t]
-					process_metadata(dialogic_para, dialogic_role, dialogic_text)
+					if last_meta_dic != {}:
+						process_set(last_meta_dic)
+						process_goto(last_meta_dic)
+					last_meta_dic = process_metadata(dialogic_para, dialogic_role, dialogic_text)
 					return order_text_dic[p][r][t]
-			return TEXT_IS_FINAL
 	dialogic_para = ""
 	dialogic_role = ""
 	dialogic_text = ""
 	dialogic_text_index = 0
 	return ""
 
-func process_metadata(_para : String, _role : String, _text : String) -> void:
+# FUNC 通过文本索引获取段落
+func get_para_for_text_index(_text_index : int) -> String:
+	var _para : String
+	for i in dic:
+		_para = i
+		for r in dic[_para]:
+			for t in dic[_para][r]:
+				if t.has(order_text_dic[_para][r][_text_index]):
+					return _para
+	return ""
+
+# FUNC 解析元数据
+func process_metadata(_para : String, _role : String, _text : String) -> Dictionary:
 	for i in dic[_para][_role]:
 		if i.has(_text):
 			var meta_list : Array = i[i.keys()[0]]
-			for meta in meta_list:
-				if meta.has("set"):
-					var meta_str : String = meta["set"]
-					var set_var_name : String = meta_str.get_slice(",", 0).erase(0, 1)
-					var set_var_value = meta_str.get_slice(",", 1).erase(meta_str.get_slice(",", 1).length()-1, 1)
-					var ex : Expression = Expression.new()
-					var _global_value : Dictionary = global_value
-					ex.parse(str(_global_value[set_var_name]) + set_var_value)
-					_global_value[set_var_name] = ex.execute()
-					global_value = _global_value
+			print(meta_list)
+			#for meta : Dictionary in meta_list:
+				#return meta
+	return {}
 
+# FUNC 解析选项
+func process_choice(meta : Dictionary) -> void:
+	if not meta.has("choice"): return
+	var meta_arr : Array = meta["choice"]
 
+# FUNC 解析赋值
+func process_set(meta : Dictionary) -> void:
+	if not meta.has("set"): return
+	var meta_str : String = meta["set"]
+	var set_var_name : String = meta_str.get_slice(",", 0).erase(0, 1)
+	var set_var_value = meta_str.get_slice(",", 1).erase(meta_str.get_slice(",", 1).length()-1, 1)
+	var ex : Expression = Expression.new()
+	var _global_value : Dictionary = global_value
+	ex.parse(str(_global_value[set_var_name]) + set_var_value)
+	_global_value[set_var_name] = ex.execute()
+	global_value = _global_value
+
+# FUNC 解析跳转
+func process_goto(meta : Dictionary) -> void:
+	if not meta.has("goto"): return
+	var meta_str : String = meta["goto"]
+	get_dialog_text(get_para_frist_text_index(meta_str))
+
+# FUNC 获取下一句文本
 func get_next_text() -> String:
 	var _text : String
 	dialogic_text_index += 1
 	_text = get_dialog_text(dialogic_text_index)
-	if _text == TEXT_IS_FINAL:
-		dialogic_text_index -= 1
-		_text = get_dialog_text(dialogic_text_index)
-		return _text
+	next_text.emit(_text)
 	return _text
 
+# FUNC 获取上一句文本
 func get_previous_text() -> String:
+	var _text : String
 	dialogic_text_index -= 1
-	return get_dialog_text(dialogic_text_index)
+	_text = get_dialog_text(dialogic_text_index)
+	previous_text.emit(_text)
+	return _text
 
+# FUNC 解析并声明全局变量
 func declare_global_var() -> void:
 	for i : String in var_dic:
 		if i == "_global":
@@ -116,6 +162,7 @@ func declare_global_var() -> void:
 				var global_var_parts : Array = _global_var.split(",")
 				global_value[global_var_parts[0].erase(0, 1)] = float(global_var_parts[1])
 
+# FUNC 读取ddc文件
 func read_ddc_file(file_path : String) -> void:
 	if file_path.get_extension() != "ddc":
 		push_error("读取的文件必须是ddc文件")
@@ -128,7 +175,6 @@ func read_ddc_file(file_path : String) -> void:
 	var_dic = code_arr[1]
 
 	order_text_dic = get_order_text_dic(code_rows)
-	print(order_text_dic)
 
 # FUNC 过滤:的方法
 func erase_end(code_part : String) -> String:
@@ -188,9 +234,9 @@ func child_key_parser(code_parts : Array, code_part_index : int) -> bool:
 			if dic[current_para][current_role][index].keys()[0] != current_text: continue
 			if is_choice:
 				if i in ["continue", "end"]:
-					dic[current_para][current_role][index][current_text][current_text_meta_index]["choice"][current_choice_index][current_choice].append(CodeKeyType.CONTINUE if i == "continue" else CodeKeyType.END)
+					dic[current_para][current_role][index][current_text][-1]["choice"][current_choice_index][current_choice].append(CodeKeyType.CONTINUE if i == "continue" else CodeKeyType.END)
 					continue
-				dic[current_para][current_role][index][current_text][current_text_meta_index]["choice"][current_choice_index][current_choice].append({i : code_part})
+				dic[current_para][current_role][index][current_text][-1]["choice"][current_choice_index][current_choice].append({i : code_part})
 				continue
 			if i in ["continue", "end"]:
 				dic[current_para][current_role][index][current_text].append(CodeKeyType.CONTINUE if i == "continue" else CodeKeyType.END)
@@ -212,6 +258,9 @@ func code_parser(code_rows : Array) -> Array:
 		tab_num = code_parts[0].count("\t")
 		code_parts[0] = code_parts[0].split("\t")[-1]
 
+		if tab_num < 3:
+			is_choice = false
+
 		# NOTE 解析成员关键字 global local signal
 		var member_parser_arr : Array = member_key_parser(code_parts, var_dic)
 		var_dic = member_parser_arr[0]
@@ -228,7 +277,6 @@ func code_parser(code_rows : Array) -> Array:
 
 		# NOTE 解析文本关键字
 		if code_parts.has("text"):
-			is_choice = false
 			code_part_index = code_parts.find("text") + 1
 			var code_part : String = code_parts[code_part_index]
 			code_part = erase_end(code_part)
@@ -248,17 +296,21 @@ func code_parser(code_rows : Array) -> Array:
 			code_part = erase_end(code_part)
 			current_choice = code_part
 			for i in dic[current_para][current_role].size():
-				var dic_current_texts : Dictionary = dic[current_para][current_role][i]
-				if dic_current_texts.keys()[0] == current_text:
-					for y in dic_current_texts[current_text].size():
-						current_text_meta_index = y
-						if not dic_current_texts[current_text][y].keys().has("choice"):
-							dic_current_texts[current_text][y]["choice"] = []
-						dic_current_texts[current_text][y]["choice"].append({code_part : []})
-						current_choice_index += 1
+				if dic[current_para][current_role][i].keys()[0] == current_text:
+					var _choice : bool = false
+					for y in dic[current_para][current_role][i][current_text].size():
+						if dic[current_para][current_role][i][current_text][y].keys().has("choice"):
+							_choice = true
+							break
+					if not _choice:
+						dic[current_para][current_role][i][current_text].append({"choice" : []})
+					for y in dic[current_para][current_role][i][current_text].size():
+						current_text_meta_index = y + 1
+						dic[current_para][current_role][i][current_text][-1]["choice"].append({code_part : []})
 						is_choice = true
 						break
 					break
+				break
 			continue
 
 		# NOTE 解析子成员关键字
